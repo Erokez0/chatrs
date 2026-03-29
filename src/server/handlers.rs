@@ -20,12 +20,9 @@ pub async fn handle<S, G>(
     S: Storage,
     G: IdentifierGenerator,
 {
-    match message {
-        Message::Close(_) => {
-            state.remove_connection(user_id).await;
-            return;
-        }
-        _ => {}
+    if let Message::Close(_) = message {
+        state.remove_connection(user_id).await;
+        return;
     };
 
     let request_message: RequestMessage = match message.try_into() {
@@ -56,10 +53,7 @@ pub async fn handle<S, G>(
         return;
     }
 
-    match request_message.clone() {
-        RequestMessage::UserSentMessage { message } => {
-            user_sent_message_handler(user_id.clone(), tx.clone(), &message, state).await;
-        }
-        _ => (),
+    if let RequestMessage::UserSentMessage { message } = request_message.clone() {
+        user_sent_message_handler(user_id.clone(), tx.clone(), &message, state).await;
     };
 }

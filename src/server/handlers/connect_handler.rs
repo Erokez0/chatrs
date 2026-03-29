@@ -18,7 +18,7 @@ pub async fn welcome_new_user<S, G>(
 {
     log::info!("got new user id: {user_id}");
     let request_message = RequestMessage::ServerGaveId {
-        user_id: user_id,
+        user_id,
         at: Timestamp::now(),
     };
 
