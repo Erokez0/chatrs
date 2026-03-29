@@ -1,4 +1,3 @@
-use super::UserId;
 use rand::random_range;
 use std::collections::HashMap;
 
@@ -14,7 +13,7 @@ impl HRGenerator {
 }
 
 impl IdentifierGenerator for HRGenerator {
-    fn new_id(&mut self) -> UserId {
+    fn new_id(&mut self) -> String {
         log::info!("generating new human-readable identifier");
         let adjective_ix: u8 = random_range(0..10);
         let noun_ix: u8 = random_range(0..10);
@@ -32,12 +31,12 @@ impl IdentifierGenerator for HRGenerator {
                 self.0.insert(key, inc_count);
                 let id: String = format!("{0} {count}", adjective_noun_combination.clone());
                 log::info!("{id}");
-                UserId::new(id)
+                id
             }
             None => {
                 self.0.insert(adjective_noun_combination.clone(), 1);
                 log::info!("{adjective_noun_combination}");
-                UserId::new(adjective_noun_combination)
+                adjective_noun_combination
             }
         }
     }

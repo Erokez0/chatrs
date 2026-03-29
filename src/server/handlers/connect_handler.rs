@@ -5,20 +5,20 @@ use crate::{
     message::RequestMessage,
     server::{state::ServerState, timestamp::Timestamp},
     storage::Storage,
-    utils::{IdentifierGenerator, UserId},
+    utils::IdentifierGenerator,
 };
 
 pub async fn welcome_new_user<S, G>(
     tx: mpsc::UnboundedSender<Message>,
-    user_id: UserId,
-    mut state: ServerState<S, G>,
+    user_id: String,
+    _state: ServerState<S, G>,
 ) where
     S: Storage,
     G: IdentifierGenerator,
 {
     log::info!("got new user id: {user_id}");
     let request_message = RequestMessage::ServerGaveId {
-        user_id: user_id.to_string(),
+        user_id: user_id,
         at: Timestamp::now(),
     };
 

@@ -7,12 +7,12 @@ use axum::extract::WebSocketUpgrade;
 use axum::extract::ws::Message;
 use axum::extract::ws::WebSocket;
 use axum::response::IntoResponse;
-use axum::routing::any;
+use axum::routing::get;
 use futures::SinkExt;
 use futures::StreamExt;
 use tokio::sync::mpsc;
 
-use crate::message::RequestMessage;
+use crate::server::handlers::handle;
 use crate::server::state::ServerState;
 
 mod handlers;
@@ -21,7 +21,6 @@ pub mod timestamp;
 
 use crate::storage::Storage;
 use crate::utils::IdentifierGenerator;
-use crate::utils::UserId;
 
 pub struct Server<S, G>
 where
@@ -47,10 +46,10 @@ where
     pub async fn start(self) {
         let state = ServerState::<S, G>::new();
         let app: Router = Router::new()
-            .route("/", any(Server::websocket_handler))
+            .route("/", get(Server::websocket_handler))
             .with_state(state);
 
-        const ADDRESS: &'static str = "0.0.0.0:1337";
+        const ADDRESS: &str = "0.0.0.0:1337";
         let listener = tokio::net::TcpListener::bind(ADDRESS).await.unwrap();
 
         axum::serve(
@@ -73,14 +72,18 @@ where
         let (mut sender, mut receiver) = ws.split();
         let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-        let user_id: UserId = state.generator.new_id();
+        for (id, _) in state.connections().await.iter() {
+            log::info!("{id}");
+        }
+
+        let user_id: String = state.add_connection(tx.clone()).await;
 
         handlers::welcome_new_user(tx.clone(), user_id.clone(), state.clone()).await;
-        state.add_connection(user_id.clone(), tx.clone());
 
         let forward_task = tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
                 // The sink may fail if the client disconnects; ignore errors here
+                log::info!("{0}", msg.to_text().unwrap());
                 let _ = sender.send(msg).await;
             }
         });
@@ -94,59 +97,7 @@ where
                         return;
                     }
                 };
-
-                let request_message: RequestMessage = match message.try_into() {
-                    Ok(req_msg) => req_msg,
-                    Err(err) => {
-                        log::error!("error converting websocket message to request message");
-                        RequestMessage::ServerResponseStatus {
-                            ok: true,
-                            text: err.to_string(),
-                        }
-                    }
-                };
-
-                for (id, tx) in state.connections() {
-                    if *id == user_id {
-                        continue;
-                    }
-                    match tx.send(request_message.clone().try_into().unwrap()) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            log::error!("error converting websocket message to request message");
-                            RequestMessage::ServerResponseStatus {
-                                ok: true,
-                                text: err.to_string(),
-                            };
-                        }
-                    }
-                }
-
-                let response: RequestMessage = request_message;
-
-                let response_message: Message = match response.try_into() {
-                    Ok(message) => message,
-                    Err(err) => {
-                        log::error!(
-                            "got an error converting response to a websocket message: {err}"
-                        );
-                        match (RequestMessage::ServerResponseStatus {
-                            ok: false,
-                            text: err.to_string(),
-                        })
-                        .try_into()
-                        {
-                            Ok(status_message) => status_message,
-                            Err(_) => Message::Text("there is a lot going on".to_string().into()),
-                        }
-                    }
-                };
-
-                let send_result = tx.clone().send(response_message);
-                match send_result {
-                    Ok(()) => (),
-                    Err(err) => log::error!("got an error sending websocket message: {err}"),
-                };
+                handle(user_id.clone(), message, tx.clone(), state.clone()).await;
             }
         });
 

@@ -9,11 +9,13 @@ use serde::{Deserialize, Serialize};
 pub struct Timestamp(u64);
 
 impl Timestamp {
-    pub fn now() -> u64 {
-        time::SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64
+    pub fn now() -> Timestamp {
+        Timestamp(
+            time::SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        )
     }
 }
 
