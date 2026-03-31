@@ -72,10 +72,6 @@ where
         let (mut sender, mut receiver) = ws.split();
         let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-        for (id, _) in state.connections().await.iter() {
-            log::info!("{id}");
-        }
-
         let user_id: String = state.add_connection(tx.clone()).await;
 
         handlers::welcome_new_user(tx.clone(), user_id.clone(), state.clone()).await;
